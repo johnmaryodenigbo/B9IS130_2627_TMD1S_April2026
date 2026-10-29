@@ -1,6 +1,7 @@
 import { env } from './config/env.js';
 import { connectDB, disconnectDB } from './config/db.js';
 import { createApp } from './app.js';
+import { createScheduler } from './worker/scheduler.js';
 
 async function start() {
   await connectDB(env.mongoUri);
@@ -9,8 +10,15 @@ async function start() {
     console.log(`API listening on http://localhost:${env.port} (${env.nodeEnv})`);
   });
 
+  // The monitoring worker runs inside the API unless WORKER_ENABLED=false.
+  const scheduler = env.workerEnabled
+    ? createScheduler({ tickMs: env.workerTickMs, concurrency: env.workerConcurrency })
+    : null;
+  scheduler?.start();
+
   const shutdown = async (signal) => {
     console.log(`${signal} received, shutting down...`);
+    await scheduler?.stop();
     server.close(async () => {
       await disconnectDB();
       process.exit(0);

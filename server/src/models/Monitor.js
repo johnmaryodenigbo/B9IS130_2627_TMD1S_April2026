@@ -31,6 +31,9 @@ const monitorSchema = new mongoose.Schema(
     lastStatusCode: { type: Number },
     lastResponseTimeMs: { type: Number },
     lastError: { type: String },
+    consecutiveFailures: { type: Number, default: 0 },
+    statusChangedAt: { type: Date },              // when it last went up/down (for "down since")
+    nextCheckAt: { type: Date, default: Date.now }, // the worker picks up monitors whose time has come
 
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -50,7 +53,7 @@ const monitorSchema = new mongoose.Schema(
 
 // The same name can exist once per environment (e.g. "Payments API" in production and staging).
 monitorSchema.index({ name: 1, environment: 1 }, { unique: true });
-monitorSchema.index({ isActive: 1 });
+monitorSchema.index({ isActive: 1, nextCheckAt: 1 });
 
 // A request must time out before the next check is due.
 monitorSchema.pre('validate', function checkTimeout() {
