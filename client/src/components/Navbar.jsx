@@ -17,6 +17,7 @@ export default function Navbar() {
       <nav>
         <NavLink to="/" end>Status</NavLink>
         {user && <NavLink to="/on-call">On-call</NavLink>}
+        {user && <NavLink to="/monitors">Monitors</NavLink>}
         {user?.role === ROLES.ADMIN && <NavLink to="/admin/users">Users</NavLink>}
         {user && <NavLink to="/account">Account</NavLink>}
       </nav>

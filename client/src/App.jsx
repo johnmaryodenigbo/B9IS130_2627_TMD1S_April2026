@@ -6,6 +6,7 @@ import Login from './pages/Login.jsx';
 import OnCall from './pages/OnCall.jsx';
 import Account from './pages/Account.jsx';
 import AdminUsers from './pages/AdminUsers.jsx';
+import Monitors from './pages/Monitors.jsx';
 import { Forbidden, NotFound } from './pages/Errors.jsx';
 import { ROLES } from './api/client.js';
 

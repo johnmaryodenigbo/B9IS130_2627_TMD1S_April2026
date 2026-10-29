@@ -1,5 +1,6 @@
 import { User } from '../models/User.js';
 import { AppError } from '../utils/AppError.js';
+import { ROLES } from '../utils/roles.js';
 
 async function findUserOr404(id) {
   const user = await User.findById(id);
