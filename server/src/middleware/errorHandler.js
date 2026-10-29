@@ -17,6 +17,13 @@ export function errorHandler(err, _req, res, _next) {
     const field = Object.keys(err.keyValue || {})[0] || 'field';
     return res.status(409).json({ error: `A record with that ${field} already exists` });
   }
+  if (err?.name === 'ValidationError') {
+    // Mongoose schema validation (e.g. timeout longer than interval)
+    return res.status(400).json({
+      error: 'Validation failed',
+      details: Object.values(err.errors).map((e) => ({ field: e.path, message: e.message })),
+    });
+  }
   if (err?.name === 'CastError') {
     return res.status(400).json({ error: 'Invalid id' });
   }
