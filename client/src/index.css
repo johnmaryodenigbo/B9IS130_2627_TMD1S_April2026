@@ -75,3 +75,27 @@ input, select { padding: .55rem .7rem; border: 1px solid var(--border); border-r
 .status-list li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .7rem 0; border-bottom: 1px solid var(--border); }
 .status-list li:last-child { border-bottom: 0; }
 .status-meta { display: flex; align-items: center; gap: .6rem; }
+
+/* ---------- Monitoring results (phase 3) ---------- */
+.link { background: none; border: 0; padding: 0; color: var(--primary); cursor: pointer; font: inherit; text-align: left; }
+.link:hover { text-decoration: underline; }
+.error-text { color: var(--danger); }
+.ok-text { color: var(--ok); }
+.uptime { font-weight: 600; font-variant-numeric: tabular-nums; }
+.uptime-good { color: var(--ok); }
+.uptime-warn { color: var(--warn); }
+.uptime-bad { color: var(--danger); }
+.uptime-none { color: var(--muted); }
+.status-list li { flex-direction: column; align-items: stretch; }
+.status-list li.status-row-top, .status-row-top { display: flex; flex-direction: row; justify-content: space-between; align-items: center; gap: 1rem; }
+.bars { display: flex; gap: 2px; height: 28px; margin-top: .5rem; }
+.bar { flex: 1; border-radius: 2px; min-width: 3px; }
+.bar-good { background: var(--ok); }
+.bar-warn { background: var(--warn); }
+.bar-bad { background: var(--danger); }
+.bar-none { background: var(--border); }
+.bars-legend { display: flex; justify-content: space-between; margin-top: .25rem; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.stat { display: flex; flex-direction: column; align-items: flex-start; }
+.stat-value { font-size: 1.8rem; font-weight: 700; }
+.btn:disabled { opacity: .5; cursor: not-allowed; }

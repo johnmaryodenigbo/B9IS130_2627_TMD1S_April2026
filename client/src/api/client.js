@@ -41,6 +41,8 @@ export const monitorsApi = {
   create: (monitor) => api('/monitors', { method: 'POST', body: monitor }),
   update: (id, changes) => api(`/monitors/${id}`, { method: 'PATCH', body: changes }),
   remove: (id) => api(`/monitors/${id}`, { method: 'DELETE' }),
+  checks: (id, limit = 20) => api(`/monitors/${id}/checks?limit=${limit}`),
+  checkNow: (id) => api(`/monitors/${id}/check`, { method: 'POST' }),
 };
 
 export const publicApi = {
