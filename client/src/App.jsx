@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
+import LiveAlerts from './components/LiveAlerts.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Login from './pages/Login.jsx';
@@ -14,6 +15,7 @@ export default function App() {
   return (
     <>
       <Navbar />
+      <LiveAlerts />
       <main className="container">
         <Routes>
           {/* Public (anonymous) */}
@@ -25,6 +27,7 @@ export default function App() {
           <Route element={<ProtectedRoute roles={[ROLES.ADMIN, ROLES.SRE]} />}>
             <Route path="/on-call" element={<OnCall />} />
             <Route path="/account" element={<Account />} />
+            <Route path="/monitors" element={<Monitors />} />
           </Route>
 
           {/* Admin only */}

@@ -1,28 +1,36 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { publicApi } from '../api/client.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import UptimeBars from '../components/UptimeBars.jsx';
+import LiveIndicator from '../components/LiveIndicator.jsx';
+import { useLiveMonitors } from '../hooks/useLiveMonitors.js';
 import { timeAgo, formatUptime } from '../utils/format.js';
 
-const REFRESH_MS = 15000;
+const FALLBACK_REFRESH_MS = 60000; // safety net; normal updates arrive live over Socket.IO
 const ENV_ORDER = ['production', 'staging', 'qa', 'development'];
 
-// Public status dashboard (no login). Live push updates arrive in phase 4; for now it polls.
+// Public status dashboard (no login). Updates live over Socket.IO.
 export default function Dashboard() {
   const [monitors, setMonitors] = useState(null);
   const [error, setError] = useState('');
   const [updatedAt, setUpdatedAt] = useState(null);
 
-  useEffect(() => {
-    const load = () =>
+  const load = useCallback(
+    () =>
       publicApi
         .monitors()
         .then(({ monitors }) => { setMonitors(monitors); setError(''); setUpdatedAt(new Date()); })
-        .catch((e) => setError(e.message));
+        .catch((e) => setError(e.message)),
+    []
+  );
+
+  useEffect(() => {
     load();
-    const id = setInterval(load, REFRESH_MS);
+    const id = setInterval(load, FALLBACK_REFRESH_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [load]);
+
+  useLiveMonitors({ monitors, setMonitors, refetch: load, publicOnly: true, onEvent: () => setUpdatedAt(new Date()) });
 
   const active = (monitors || []).filter((m) => m.status !== 'paused');
   const down = active.filter((m) => m.status === 'down').length;
@@ -42,7 +50,10 @@ export default function Dashboard() {
     <section>
       <div className="page-header">
         <h1>System status</h1>
-        {updatedAt && <span className="muted small">Updated {updatedAt.toLocaleTimeString()}</span>}
+        <div className="status-meta">
+          {updatedAt && <span className="muted small">Updated {updatedAt.toLocaleTimeString()}</span>}
+          <LiveIndicator />
+        </div>
       </div>
       <div className={`status-banner ${banner.cls}`}>{banner.text}</div>
 

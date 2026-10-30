@@ -4,9 +4,11 @@ import { useAuth } from '../context/AuthContext.jsx';
 import MonitorForm, { toFormValues } from '../components/MonitorForm.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import CheckHistory from '../components/CheckHistory.jsx';
+import LiveIndicator from '../components/LiveIndicator.jsx';
+import { useLiveMonitors } from '../hooks/useLiveMonitors.js';
 import { timeAgo, formatUptime, uptimeClass } from '../utils/format.js';
 
-const REFRESH_MS = 15000;
+const FALLBACK_REFRESH_MS = 60000; // safety net; normal updates arrive live over Socket.IO
 const intervalLabel = (s) => INTERVALS.find((i) => i.value === s)?.label || `${s}s`;
 const errorText = (err) => err.details?.map((d) => `${d.field}: ${d.message}`).join(' · ') || err.message;
 
@@ -28,12 +30,25 @@ export default function Monitors() {
     [filters]
   );
 
-  // Load now and refresh regularly so results from the worker show up.
   useEffect(() => {
     load();
-    const id = setInterval(() => { load(); setRefreshKey((k) => k + 1); }, REFRESH_MS);
+    const id = setInterval(load, FALLBACK_REFRESH_MS);
     return () => clearInterval(id);
   }, [load]);
+
+  // Live updates: merge new check results, and refresh the open history panel when its monitor changes.
+  useLiveMonitors({
+    monitors,
+    setMonitors,
+    refetch: load,
+    onEvent: (type, data) => {
+      const id = data.id ?? data.monitor?.id;
+      if (historyFor && id === historyFor.id) {
+        if (type === 'removed') setHistoryFor(null);
+        else setRefreshKey((k) => k + 1);
+      }
+    },
+  });
 
   // Runs an API call, shows any error, then reloads the list.
   const run = async (fn) => {
@@ -96,7 +111,8 @@ export default function Monitors() {
             <option value="">All environments</option>
             {ENVIRONMENTS.map((env) => <option key={env} value={env}>{env}</option>)}
           </select>
-          <span className="muted">{monitors.length} monitor{monitors.length === 1 ? '' : 's'} · refreshes every {REFRESH_MS / 1000}s</span>
+          <span className="muted">{monitors.length} monitor{monitors.length === 1 ? '' : 's'}</span>
+          <LiveIndicator />
         </div>
 
         {monitors.length === 0 ? (

@@ -46,7 +46,7 @@ input, select { padding: .55rem .7rem; border: 1px solid var(--border); border-r
 .table th, .table td { text-align: left; padding: .55rem .5rem; border-bottom: 1px solid var(--border); }
 .table-wrap, .card:has(.table) { overflow-x: auto; }
 
-/* ---------- Monitors (phase 2) ---------- */
+/* ---------- Monitors ---------- */
 .page-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .page-header h1 { margin: 0; }
 .form.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem 1rem; }
@@ -76,7 +76,7 @@ input, select { padding: .55rem .7rem; border: 1px solid var(--border); border-r
 .status-list li:last-child { border-bottom: 0; }
 .status-meta { display: flex; align-items: center; gap: .6rem; }
 
-/* ---------- Monitoring results (phase 3) ---------- */
+/* ---------- Monitoring results ---------- */
 .link { background: none; border: 0; padding: 0; color: var(--primary); cursor: pointer; font: inherit; text-align: left; }
 .link:hover { text-decoration: underline; }
 .error-text { color: var(--danger); }
@@ -99,3 +99,17 @@ input, select { padding: .55rem .7rem; border: 1px solid var(--border); border-r
 .stat { display: flex; flex-direction: column; align-items: flex-start; }
 .stat-value { font-size: 1.8rem; font-weight: 700; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ---------- Live updates ---------- */
+.live { display: inline-flex; align-items: center; gap: .35rem; font-size: .8rem; font-weight: 600; padding: .15rem .55rem; border-radius: 999px; border: 1px solid var(--border); }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.live-on { color: var(--ok); }
+.live-on .live-dot { animation: pulse 2s ease-in-out infinite; }
+.live-off { color: var(--muted); }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .live-on .live-dot { animation: none; } }
+.toasts { position: fixed; bottom: 1rem; right: 1rem; z-index: 50; display: flex; flex-direction: column; gap: .5rem; width: min(360px, calc(100vw - 2rem)); }
+.toast { display: flex; justify-content: space-between; gap: .75rem; padding: .75rem .9rem; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); border-left-width: 4px; box-shadow: 0 6px 20px rgba(0,0,0,.12); font-size: .9rem; }
+.toast-down { border-left-color: var(--danger); }
+.toast-up { border-left-color: var(--ok); }
+.toast-close { background: none; border: 0; color: var(--muted); font-size: 1.2rem; cursor: pointer; line-height: 1; }

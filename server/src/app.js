@@ -11,16 +11,14 @@ import monitorRoutes from './routes/monitor.routes.js';
 import publicRoutes from './routes/public.routes.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 
-
 export function createApp() {
   const app = express();
+
   app.use(helmet());
-  app.use(cors({ origin: true, credentials: true }));
   app.use(cors({ origin: env.clientUrl, credentials: true }));
   app.use(express.json({ limit: '100kb' }));
   app.use(cookieParser());
-  app.use(cors({ origin: true, credentials: true }));         // line 17 – allows ANY website
-  app.use(cors({ origin: env.clientUrl, credentials: true }));  // line 18 – allows only your frontend
+  if (env.nodeEnv !== 'test') app.use(morgan(env.isProd ? 'combined' : 'dev'));
 
   app.get('/api/health', (_req, res) => {
     const dbUp = mongoose.connection.readyState === 1;
@@ -34,6 +32,5 @@ export function createApp() {
 
   app.use(notFound);
   app.use(errorHandler);
-
   return app;
 }

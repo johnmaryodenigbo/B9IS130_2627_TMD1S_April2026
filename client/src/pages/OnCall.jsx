@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom';
 import { monitorsApi } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
+import LiveIndicator from '../components/LiveIndicator.jsx';
+import { useLiveMonitors } from '../hooks/useLiveMonitors.js';
 import { timeAgo } from '../utils/format.js';
 
-const REFRESH_MS = 15000;
+const FALLBACK_REFRESH_MS = 60000; // safety net; normal updates arrive live over Socket.IO
 
-// SRE home: what is broken right now. Email alerts arrive in phase 5.
+// SRE home: what is broken right now, updated live. Email alerts arrive in phase 5.
 export default function OnCall() {
   const { user } = useAuth();
   const [monitors, setMonitors] = useState(null);
@@ -21,9 +23,11 @@ export default function OnCall() {
 
   useEffect(() => {
     load();
-    const id = setInterval(load, REFRESH_MS);
+    const id = setInterval(load, FALLBACK_REFRESH_MS);
     return () => clearInterval(id);
   }, [load]);
+
+  useLiveMonitors({ monitors, setMonitors, refetch: load });
 
   const checkNow = async (id) => {
     setChecking(id);
@@ -37,7 +41,10 @@ export default function OnCall() {
 
   return (
     <section>
-      <h1>Welcome, {user.name}</h1>
+      <div className="page-header">
+        <h1>Welcome, {user.name}</h1>
+        <LiveIndicator />
+      </div>
       {error && <p className="error card">{error}</p>}
 
       <div className="stats">

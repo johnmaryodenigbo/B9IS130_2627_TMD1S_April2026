@@ -3,6 +3,8 @@ import { Check } from '../models/Check.js';
 import { AppError } from '../utils/AppError.js';
 import { runCheck } from '../services/checkRunner.js';
 import { getUptimeStats, getDailyHistory, EMPTY_UPTIME } from '../services/uptime.js';
+import { monitorEvents } from '../services/events.js';
+import { toPublicView } from '../services/monitorViews.js';
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -42,6 +44,7 @@ export async function createMonitor(req, res) {
   const data = { ...req.body, createdBy: req.user.id, updatedBy: req.user.id, nextCheckAt: new Date() };
   if (data.isActive === false) data.status = 'paused';
   const monitor = await Monitor.create(data);
+  monitorEvents.emit('monitor-saved', { monitor: monitor.toObject() });
   res.status(201).json({ monitor });
 }
 
@@ -69,12 +72,14 @@ export async function updateMonitor(req, res) {
   }
 
   await monitor.save();
+  monitorEvents.emit('monitor-saved', { monitor: monitor.toObject() });
   res.json({ monitor });
 }
 
 export async function deleteMonitor(req, res) {
   const monitor = await findMonitorOr404(req.params.id);
   await Promise.all([monitor.deleteOne(), Check.deleteMany({ monitor: monitor._id })]);
+  monitorEvents.emit('monitor-deleted', { id: monitor.id, isPublic: monitor.isPublic });
   res.status(204).end();
 }
 
@@ -106,14 +111,7 @@ export async function listPublicMonitors(_req, res) {
     monitors: monitors.map((m) => {
       const id = m._id.toString();
       return {
-        id,
-        name: m.name,
-        description: m.description,
-        environment: m.environment,
-        status: m.status,
-        statusChangedAt: m.statusChangedAt ?? null,
-        lastCheckedAt: m.lastCheckedAt ?? null,
-        lastResponseTimeMs: m.lastResponseTimeMs ?? null,
+        ...toPublicView(m),
         uptime: stats.get(id) ?? EMPTY_UPTIME,
         history: history.get(id) ?? [],
       };

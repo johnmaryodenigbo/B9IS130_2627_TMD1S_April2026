@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { authApi } from '../api/client.js';
+import { reconnectSocket } from '../realtime/socket.js';
 
 const AuthContext = createContext(null);
 
@@ -19,12 +20,14 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     const { user } = await authApi.login(email, password);
     setUser(user);
+    reconnectSocket(); // live updates now include staff details
     return user;
   }, []);
 
   const logout = useCallback(async () => {
     await authApi.logout().catch(() => {});
     setUser(null);
+    reconnectSocket(); // back to the public view
   }, []);
 
   return <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>;

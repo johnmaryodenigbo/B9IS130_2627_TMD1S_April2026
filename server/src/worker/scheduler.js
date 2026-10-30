@@ -2,14 +2,7 @@ import { Monitor } from '../models/Monitor.js';
 import { runCheck } from '../services/checkRunner.js';
 import { monitorEvents } from '../services/events.js';
 
-/**
- * Polls MongoDB every `tickMs` for monitors whose `nextCheckAt` has passed and checks them,
- * at most `concurrency` at a time.
- *
- * Each monitor is "claimed" with an atomic findOneAndUpdate that pushes its nextCheckAt forward
- * before the check starts, so running several API/worker replicas never checks the same
- * monitor twice (safe for Kubernetes with replicas > 1).
- */
+
 export function createScheduler({ tickMs = 5000, concurrency = 10, logger = console } = {}) {
   let timer = null;
   let stopped = true;
