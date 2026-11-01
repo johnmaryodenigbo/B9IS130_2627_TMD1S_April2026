@@ -41,6 +41,7 @@ export async function updateUser(req, res) {
   if (name !== undefined) user.name = name;
   if (role !== undefined) user.role = role;
   if (isActive !== undefined) user.isActive = isActive;
+  if (onCall !== undefined) user.onCall = onCall;
   if (password !== undefined) user.password = password;
 
   await user.save();

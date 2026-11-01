@@ -43,6 +43,13 @@ export function me(req, res) {
   res.json({ user: req.user });
 }
 
+// e.g. an SRE turning their own alert emails on/off.
+export async function updateMe(req, res) {
+  if (req.body.onCall !== undefined) req.user.onCall = req.body.onCall;
+  await req.user.save();
+  res.json({ user: req.user });
+}
+
 export async function changePassword(req, res) {
   const user = await User.findById(req.user.id).select('+password');
   if (!(await user.comparePassword(req.body.currentPassword))) {

@@ -9,6 +9,7 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true, minlength: 8, select: false },
     role: { type: String, enum: ROLE_VALUES, default: ROLES.SRE },
     isActive: { type: Boolean, default: true },
+    onCall: { type: Boolean, default: true }, // SREs with onCall=true receive downtime emails
     lastLoginAt: { type: Date },
   },
   {

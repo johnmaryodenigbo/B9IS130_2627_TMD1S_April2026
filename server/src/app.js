@@ -9,6 +9,8 @@ import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
 import monitorRoutes from './routes/monitor.routes.js';
 import publicRoutes from './routes/public.routes.js';
+import incidentRoutes from './routes/incident.routes.js';
+import alertRoutes from './routes/alert.routes.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 
 export function createApp() {
@@ -29,6 +31,8 @@ export function createApp() {
   app.use('/api/users', userRoutes);
   app.use('/api/monitors', monitorRoutes);
   app.use('/api/public', publicRoutes);
+  app.use('/api/incidents', incidentRoutes);
+  app.use('/api/alerts', alertRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

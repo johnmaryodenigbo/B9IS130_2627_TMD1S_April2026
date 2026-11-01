@@ -22,4 +22,21 @@ export const env = {
   workerConcurrency: Number(process.env.WORKER_CONCURRENCY) || 10, // max checks running at once
   failureThreshold: Number(process.env.FAILURE_THRESHOLD) || 2,    // failed checks in a row before "down"
   checkRetentionDays: Number(process.env.CHECK_RETENTION_DAYS) || 90,
+
+  // Email alerts
+  // MAIL_TRANSPORT: smtp (real SMTP server), log (print emails to the console), memory (tests)
+  mailTransport: process.env.MAIL_TRANSPORT || (process.env.SMTP_HOST ? 'smtp' : 'log'),
+  smtp: {
+    host: process.env.SMTP_HOST || 'localhost',
+    port: Number(process.env.SMTP_PORT) || 1025,
+    secure: process.env.SMTP_SECURE === 'true', // true for port 465
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+  },
+  alertFrom: process.env.ALERT_FROM || 'ZOps Alerts <alerts@zops.local>',
+  appUrl: process.env.APP_URL || process.env.CLIENT_URL || 'http://localhost:5173', // links in emails
+  // Don't email again for the same monitor if it went down within this many minutes (flapping)
+  alertCooldownMinutes: Number(process.env.ALERT_COOLDOWN_MINUTES ?? 5),
+  // Re-send the DOWN email every N minutes while unacknowledged (0 = never)
+  alertReminderMinutes: Number(process.env.ALERT_REMINDER_MINUTES ?? 60),
 };

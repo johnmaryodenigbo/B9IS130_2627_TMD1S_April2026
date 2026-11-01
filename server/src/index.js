@@ -4,6 +4,8 @@ import { createApp } from './app.js';
 import { createScheduler } from './worker/scheduler.js';
 import { initRealtime } from './realtime/socket.js';
 import { startChangeRelay } from './realtime/changeRelay.js';
+import { startAlerting } from './services/alerts.js';
+import { verifyMailer } from './services/mailer.js';
 
 async function start() {
   await connectDB(env.mongoUri);
@@ -20,6 +22,9 @@ async function start() {
     ? createScheduler({ tickMs: env.workerTickMs, concurrency: env.workerConcurrency })
     : null;
   scheduler?.start();
+  // Email alerts. Always on in the API ("check now" runs here); reminders run where the worker runs.
+  const alerting = startAlerting({ reminders: env.workerEnabled });
+  verifyMailer();
   // Worker in another process? Pick up its results from MongoDB instead.
   const relay = env.workerEnabled ? null : startChangeRelay();
 

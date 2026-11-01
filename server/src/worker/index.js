@@ -3,11 +3,15 @@
 import { env } from '../config/env.js';
 import { connectDB, disconnectDB } from '../config/db.js';
 import { createScheduler } from './scheduler.js';
+import { startAlerting } from '../services/alerts.js';
+import { verifyMailer } from '../services/mailer.js';
 
 async function start() {
   await connectDB(env.mongoUri);
   const scheduler = createScheduler({ tickMs: env.workerTickMs, concurrency: env.workerConcurrency });
   scheduler.start();
+  const alerting = startAlerting({ reminders: true });
+  verifyMailer();
 
   const shutdown = async (signal) => {
     console.log(`${signal} received, stopping worker...`);
