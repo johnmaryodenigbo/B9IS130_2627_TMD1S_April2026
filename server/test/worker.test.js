@@ -61,8 +61,8 @@ after(async () => {
 beforeEach(async () => {
   healthy = true;
   await Promise.all([User.deleteMany({}), Monitor.deleteMany({}), Check.deleteMany({})]);
-  await User.create({ name: 'Admin', email: 'admin@test.io', password: 'Admin1234', role: 'admin' });
-  await User.create({ name: 'Sre', email: 'sre@test.io', password: 'Sre12345', role: 'sre' });
+  await User.create({ name: 'Admin', email: 'admin@zubby.com', password: 'Admin1234', role: 'admin' });
+  await User.create({ name: 'Sre', email: 'sre@zubby.com', password: 'Sre12345', role: 'sre' });
 });
 
 describe('monitoring worker', () => {
@@ -131,7 +131,7 @@ describe('monitoring worker', () => {
 describe('check & uptime API', () => {
   it('check now runs a check and returns the result (admin and SRE)', async () => {
     const m = await Monitor.create({ name: 'App', url: targetUrl });
-    const sre = await loginAs('sre@test.io', 'Sre12345');
+    const sre = await loginAs('sre@zubby.com', 'Sre12345');
     const res = await sre.post(`/api/monitors/${m.id}/check`).expect(200);
     assert.equal(res.body.check.ok, true);
     assert.equal(res.body.monitor.status, 'up');
@@ -140,7 +140,7 @@ describe('check & uptime API', () => {
 
   it('check now refuses paused monitors', async () => {
     const m = await Monitor.create({ name: 'App', url: targetUrl, isActive: false, status: 'paused' });
-    const admin = await loginAs('admin@test.io', 'Admin1234');
+    const admin = await loginAs('admin@zubby.com', 'Admin1234');
     await admin.post(`/api/monitors/${m.id}/check`).expect(400);
   });
 
@@ -150,7 +150,7 @@ describe('check & uptime API', () => {
       { monitor: m._id, ok: true, checkedAt: new Date(Date.now() - 60_000) },
       { monitor: m._id, ok: false, checkedAt: new Date() },
     ]);
-    const admin = await loginAs('admin@test.io', 'Admin1234');
+    const admin = await loginAs('admin@zubby.com', 'Admin1234');
     const res = await admin.get(`/api/monitors/${m.id}/checks`).expect(200);
     assert.deepEqual(res.body.checks.map((c) => c.ok), [false, true]);
   });
@@ -165,7 +165,7 @@ describe('check & uptime API', () => {
       { monitor: m._id, ok: false, checkedAt: new Date(Date.now() - 4 * hour) },
       { monitor: m._id, ok: false, checkedAt: new Date(Date.now() - 3 * 24 * hour) },
     ]);
-    const admin = await loginAs('admin@test.io', 'Admin1234');
+    const admin = await loginAs('admin@zubby.com', 'Admin1234');
     const res = await admin.get('/api/monitors').expect(200);
     assert.deepEqual(res.body.monitors[0].uptime, { day: 75, week: 60, month: 60 });
   });
@@ -184,14 +184,14 @@ describe('check & uptime API', () => {
   it('deleting a monitor deletes its checks', async () => {
     const m = await Monitor.create({ name: 'App', url: targetUrl });
     await Check.create({ monitor: m._id, ok: true });
-    const admin = await loginAs('admin@test.io', 'Admin1234');
+    const admin = await loginAs('admin@zubby.com', 'Admin1234');
     await admin.delete(`/api/monitors/${m.id}`).expect(204);
     assert.equal(await Check.countDocuments(), 0);
   });
 
   it('resuming a monitor schedules an immediate check', async () => {
     const m = await Monitor.create({ name: 'App', url: targetUrl, isActive: false, status: 'paused', nextCheckAt: new Date(Date.now() + 3600_000) });
-    const admin = await loginAs('admin@test.io', 'Admin1234');
+    const admin = await loginAs('admin@zubby.com', 'Admin1234');
     await admin.patch(`/api/monitors/${m.id}`).send({ isActive: true }).expect(200);
     const updated = await Monitor.findById(m.id);
     assert.ok(updated.nextCheckAt <= new Date());

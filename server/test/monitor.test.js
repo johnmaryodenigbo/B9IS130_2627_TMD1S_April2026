@@ -35,13 +35,13 @@ after(async () => {
 
 beforeEach(async () => {
   await Promise.all([User.deleteMany({}), Monitor.deleteMany({})]);
-  await User.create({ name: 'Admin', email: 'admin@test.io', password: 'Admin1234', role: 'admin' });
-  await User.create({ name: 'Sre', email: 'sre@test.io', password: 'Sre12345', role: 'sre' });
+  await User.create({ name: 'Admin', email: 'admin@zubby.com', password: 'Admin1234', role: 'admin' });
+  await User.create({ name: 'Sre', email: 'sre@zubby.com', password: 'Sre12345', role: 'sre' });
 });
 
 describe('monitor inventory', () => {
   it('admin can create a monitor with sensible defaults', async () => {
-    const admin = await loginAs('admin@test.io', 'Admin1234');
+    const admin = await loginAs('admin@zubby.com', 'Admin1234');
     const res = await admin.post('/api/monitors').send(sample);
     assert.equal(res.status, 201, JSON.stringify(res.body));
     const m = res.body.monitor;
@@ -53,7 +53,7 @@ describe('monitor inventory', () => {
   });
 
   it('rejects bad input', async () => {
-    const admin = await loginAs('admin@test.io', 'Admin1234');
+    const admin = await loginAs('admin@zubby.com', 'Admin1234');
     await admin.post('/api/monitors').send({ name: 'x', url: 'ftp://example.com' }).expect(400);
     await admin.post('/api/monitors').send({ ...sample, intervalSeconds: 5 }).expect(400);
     // timeout (30s) must be shorter than the interval (30s)
@@ -61,14 +61,14 @@ describe('monitor inventory', () => {
   });
 
   it('allows the same name in a different environment only', async () => {
-    const admin = await loginAs('admin@test.io', 'Admin1234');
+    const admin = await loginAs('admin@zubby.com', 'Admin1234');
     await admin.post('/api/monitors').send(sample).expect(201);
     await admin.post('/api/monitors').send(sample).expect(409);
     await admin.post('/api/monitors').send({ ...sample, environment: 'staging' }).expect(201);
   });
 
   it('pausing and resuming updates the status', async () => {
-    const admin = await loginAs('admin@test.io', 'Admin1234');
+    const admin = await loginAs('admin@zubby.com', 'Admin1234');
     const { body } = await admin.post('/api/monitors').send(sample);
     const paused = await admin.patch(`/api/monitors/${body.monitor.id}`).send({ isActive: false });
     assert.equal(paused.body.monitor.status, 'paused');
@@ -77,7 +77,7 @@ describe('monitor inventory', () => {
   });
 
   it('admin can update and delete', async () => {
-    const admin = await loginAs('admin@test.io', 'Admin1234');
+    const admin = await loginAs('admin@zubby.com', 'Admin1234');
     const { body } = await admin.post('/api/monitors').send(sample);
     const upd = await admin.patch(`/api/monitors/${body.monitor.id}`).send({ intervalSeconds: 300 });
     assert.equal(upd.body.monitor.intervalSeconds, 300);
@@ -86,9 +86,9 @@ describe('monitor inventory', () => {
   });
 
   it('SRE can view but not change the inventory', async () => {
-    const admin = await loginAs('admin@test.io', 'Admin1234');
+    const admin = await loginAs('admin@zubby.com', 'Admin1234');
     const { body } = await admin.post('/api/monitors').send(sample);
-    const sre = await loginAs('sre@test.io', 'Sre12345');
+    const sre = await loginAs('sre@zubby.com', 'Sre12345');
     const list = await sre.get('/api/monitors').expect(200);
     assert.equal(list.body.monitors.length, 1);
     await sre.post('/api/monitors').send({ ...sample, name: 'Other' }).expect(403);
@@ -101,7 +101,7 @@ describe('monitor inventory', () => {
   });
 
   it('public endpoint lists only public monitors and hides URLs', async () => {
-    const admin = await loginAs('admin@test.io', 'Admin1234');
+    const admin = await loginAs('admin@zubby.com', 'Admin1234');
     await admin.post('/api/monitors').send(sample).expect(201);
     await admin.post('/api/monitors').send({ ...sample, name: 'Internal DB', isPublic: false }).expect(201);
     const res = await request(app).get('/api/public/monitors').expect(200);
@@ -111,7 +111,7 @@ describe('monitor inventory', () => {
   });
 
   it('filters by environment and search text', async () => {
-    const admin = await loginAs('admin@test.io', 'Admin1234');
+    const admin = await loginAs('admin@zubby.com', 'Admin1234');
     await admin.post('/api/monitors').send(sample);
     await admin.post('/api/monitors').send({ ...sample, name: 'Website', environment: 'staging' });
     const env = await admin.get('/api/monitors?environment=staging');

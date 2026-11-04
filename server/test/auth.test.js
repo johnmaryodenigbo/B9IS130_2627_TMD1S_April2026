@@ -32,8 +32,8 @@ after(async () => {
 
 beforeEach(async () => {
   await User.deleteMany({});
-  await User.create({ name: 'Admin', email: 'admin@test.io', password: 'Admin1234', role: 'admin' });
-  await User.create({ name: 'Sre', email: 'sre@test.io', password: 'Sre12345', role: 'sre' });
+  await User.create({ name: 'Admin', email: 'admin@zubby.com', password: 'Admin1234', role: 'admin' });
+  await User.create({ name: 'Sre', email: 'sre@zubby.com', password: 'Sre12345', role: 'sre' });
 });
 
 describe('auth', () => {
@@ -44,22 +44,22 @@ describe('auth', () => {
   });
 
   it('hashes passwords and never returns them', async () => {
-    const raw = await User.findOne({ email: 'admin@test.io' }).select('+password');
+    const raw = await User.findOne({ email: 'admin@zubby.com' }).select('+password');
     assert.notEqual(raw.password, 'Admin1234');
-    const agent = await loginAs('admin@test.io', 'Admin1234');
+    const agent = await loginAs('admin@zubby.com', 'Admin1234');
     const res = await agent.get('/api/auth/me');
     assert.equal(res.body.user.password, undefined);
     assert.equal(res.body.user.role, 'admin');
   });
 
   it('sets an httpOnly cookie on login', async () => {
-    const res = await request(app).post('/api/auth/login').send({ email: 'ADMIN@test.io', password: 'Admin1234' });
+    const res = await request(app).post('/api/auth/login').send({ email: 'ADMIN@zubby.com', password: 'Admin1234' });
     assert.equal(res.status, 200);
     assert.match(res.headers['set-cookie'][0], /token=.*HttpOnly/i);
   });
 
   it('rejects wrong password with a generic message', async () => {
-    const res = await request(app).post('/api/auth/login').send({ email: 'admin@test.io', password: 'nope' });
+    const res = await request(app).post('/api/auth/login').send({ email: 'admin@zubby.com', password: 'nope' });
     assert.equal(res.status, 401);
     assert.equal(res.body.error, 'Invalid email or password');
   });
@@ -70,21 +70,21 @@ describe('auth', () => {
   });
 
   it('logout clears the session', async () => {
-    const agent = await loginAs('sre@test.io', 'Sre12345');
+    const agent = await loginAs('sre@zubby.com', 'Sre12345');
     await agent.post('/api/auth/logout').expect(200);
     await agent.get('/api/auth/me').expect(401);
   });
 
   it('disabled users cannot log in', async () => {
-    await User.updateOne({ email: 'sre@test.io' }, { isActive: false });
-    const res = await request(app).post('/api/auth/login').send({ email: 'sre@test.io', password: 'Sre12345' });
+    await User.updateOne({ email: 'sre@zubby.com' }, { isActive: false });
+    const res = await request(app).post('/api/auth/login').send({ email: 'sre@zubby.com', password: 'Sre12345' });
     assert.equal(res.status, 403);
   });
 
   it('changes own password', async () => {
-    const agent = await loginAs('sre@test.io', 'Sre12345');
+    const agent = await loginAs('sre@zubby.com', 'Sre12345');
     await agent.patch('/api/auth/me/password').send({ currentPassword: 'Sre12345', newPassword: 'NewPass999' }).expect(200);
-    await loginAs('sre@test.io', 'NewPass999');
+    await loginAs('sre@zubby.com', 'NewPass999');
   });
 });
 
@@ -94,13 +94,13 @@ describe('user management (RBAC)', () => {
   });
 
   it('SRE users get 403', async () => {
-    const agent = await loginAs('sre@test.io', 'Sre12345');
+    const agent = await loginAs('sre@zubby.com', 'Sre12345');
     await agent.get('/api/users').expect(403);
     await agent.post('/api/users').send({ name: 'x', email: 'x@test.io', password: 'Abcd1234', role: 'admin' }).expect(403);
   });
 
   it('admin can create, list, update and delete users', async () => {
-    const agent = await loginAs('admin@test.io', 'Admin1234');
+    const agent = await loginAs('admin@zubby.com', 'Admin1234');
     const created = await agent.post('/api/users').send({ name: 'New Sre', email: 'new@test.io', password: 'Abcd1234', role: 'sre' });
     assert.equal(created.status, 201);
     const id = created.body.user.id;
@@ -115,15 +115,15 @@ describe('user management (RBAC)', () => {
   });
 
   it('validates input and rejects duplicate emails', async () => {
-    const agent = await loginAs('admin@test.io', 'Admin1234');
+    const agent = await loginAs('admin@zubby.com', 'Admin1234');
     const bad = await agent.post('/api/users').send({ name: 'x', email: 'not-an-email', password: 'short', role: 'boss' });
     assert.equal(bad.status, 400);
-    const dup = await agent.post('/api/users').send({ name: 'x', email: 'sre@test.io', password: 'Abcd1234', role: 'sre' });
+    const dup = await agent.post('/api/users').send({ name: 'x', email: 'sre@zubby.com', password: 'Abcd1234', role: 'sre' });
     assert.equal(dup.status, 409);
   });
 
   it('cannot remove the last active admin or delete yourself', async () => {
-    const agent = await loginAs('admin@test.io', 'Admin1234');
+    const agent = await loginAs('admin@zubby.com', 'Admin1234');
     const me = (await agent.get('/api/auth/me')).body.user;
     await agent.patch(`/api/users/${me.id}`).send({ role: 'sre' }).expect(400);
     await agent.patch(`/api/users/${me.id}`).send({ isActive: false }).expect(400);
