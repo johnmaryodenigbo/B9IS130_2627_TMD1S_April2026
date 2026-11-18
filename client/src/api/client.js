@@ -22,6 +22,7 @@ export const authApi = {
   login: (email, password) => api('/auth/login', { method: 'POST', body: { email, password } }),
   logout: () => api('/auth/logout', { method: 'POST' }),
   me: () => api('/auth/me'),
+  updateMe: (changes) => api('/auth/me', { method: 'PATCH', body: changes }),
   changePassword: (currentPassword, newPassword) =>
     api('/auth/me/password', { method: 'PATCH', body: { currentPassword, newPassword } }),
 };
@@ -47,6 +48,17 @@ export const monitorsApi = {
 
 export const publicApi = {
   monitors: () => api('/public/monitors'),
+  incidents: (days = 14) => api(`/public/incidents?days=${days}`),
+};
+
+export const incidentsApi = {
+  list: ({ status, limit = 50 } = {}) => api(`/incidents?limit=${limit}${status ? `&status=${status}` : ''}`),
+  acknowledge: (id) => api(`/incidents/${id}/acknowledge`, { method: 'POST' }),
+};
+
+export const alertsApi = {
+  test: () => api('/alerts/test', { method: 'POST' }),
+  recipients: () => api('/alerts/recipients'),
 };
 
 export const ROLES = { ADMIN: 'admin', SRE: 'sre' };

@@ -21,3 +21,13 @@ export function uptimeClass(value) {
   if (value >= 95) return 'warn';
   return 'bad';
 }
+
+// 754000 -> "12 min", 7380000 -> "2 h 3 min"
+export function formatDuration(ms) {
+  const minutes = Math.max(0, Math.round(ms / 60000));
+  if (minutes < 1) return '< 1 min';
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours} h${minutes % 60 ? ` ${minutes % 60} min` : ''}`;
+  return `${Math.floor(hours / 24)} d ${hours % 24} h`;
+}

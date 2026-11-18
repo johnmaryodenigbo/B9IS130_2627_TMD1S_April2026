@@ -1,24 +1,39 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { monitorsApi } from '../api/client.js';
+import { monitorsApi, incidentsApi, ROLES } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import LiveIndicator from '../components/LiveIndicator.jsx';
+import { OpenIncidents, IncidentHistory } from '../components/IncidentList.jsx';
 import { useLiveMonitors } from '../hooks/useLiveMonitors.js';
-import { timeAgo } from '../utils/format.js';
+import { useSocketEvent } from '../hooks/useSocket.js';
 
 const FALLBACK_REFRESH_MS = 60000; // safety net; normal updates arrive live over Socket.IO
 
-// SRE home: what is broken right now, updated live. Email alerts arrive in phase 5.
+// SRE home: open incidents (acknowledge, check now), monitor counts and incident history. Live.
 export default function OnCall() {
   const { user } = useAuth();
   const [monitors, setMonitors] = useState(null);
+  const [openIncidents, setOpenIncidents] = useState([]);
+  const [history, setHistory] = useState([]);
   const [error, setError] = useState('');
-  const [checking, setChecking] = useState(null);
+  const [busyId, setBusyId] = useState(null);
 
-  const load = useCallback(
-    () => monitorsApi.list({ active: 'true' }).then(({ monitors }) => { setMonitors(monitors); setError(''); }).catch((e) => setError(e.message)),
+  const loadMonitors = useCallback(
+    () => monitorsApi.list({ active: 'true' }).then(({ monitors }) => setMonitors(monitors)),
     []
+  );
+  const loadIncidents = useCallback(
+    () =>
+      Promise.all([
+        incidentsApi.list({ status: 'open' }).then(({ incidents }) => setOpenIncidents(incidents)),
+        incidentsApi.list({ status: 'resolved', limit: 20 }).then(({ incidents }) => setHistory(incidents)),
+      ]),
+    []
+  );
+  const load = useCallback(
+    () => Promise.all([loadMonitors(), loadIncidents()]).then(() => setError('')).catch((e) => setError(e.message)),
+    [loadMonitors, loadIncidents]
   );
 
   useEffect(() => {
@@ -27,17 +42,25 @@ export default function OnCall() {
     return () => clearInterval(id);
   }, [load]);
 
-  useLiveMonitors({ monitors, setMonitors, refetch: load });
+  useLiveMonitors({ monitors, setMonitors, refetch: loadMonitors });
 
-  const checkNow = async (id) => {
-    setChecking(id);
-    try { await monitorsApi.checkNow(id); await load(); } catch (e) { setError(e.message); }
-    setChecking(null);
+  // Incidents change when alerts are sent, acknowledged or resolved: refetch shortly after.
+  const timer = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  useSocketEvent('incident:update', () => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => loadIncidents().catch(() => {}), 500);
+  });
+
+  const run = async (id, fn) => {
+    setBusyId(id);
+    try { await fn(); await load(); } catch (e) { setError(e.message); }
+    setBusyId(null);
   };
 
-  const down = (monitors || []).filter((m) => m.status === 'down');
   const degraded = (monitors || []).filter((m) => m.status === 'up' && m.consecutiveFailures > 0);
   const up = (monitors || []).filter((m) => m.status === 'up').length;
+  const down = (monitors || []).filter((m) => m.status === 'down').length;
 
   return (
     <section>
@@ -50,34 +73,17 @@ export default function OnCall() {
       <div className="stats">
         <div className="card stat"><span className="stat-value">{monitors ? monitors.length : '—'}</span><span className="muted">active monitors</span></div>
         <div className="card stat"><span className="stat-value ok-text">{monitors ? up : '—'}</span><span className="muted">up</span></div>
-        <div className="card stat"><span className={`stat-value ${down.length ? 'error-text' : ''}`}>{monitors ? down.length : '—'}</span><span className="muted">down</span></div>
+        <div className="card stat"><span className={`stat-value ${down ? 'error-text' : ''}`}>{monitors ? down : '—'}</span><span className="muted">down</span></div>
       </div>
 
       <div className="card">
-        <h2>Currently down</h2>
-        {!monitors ? (
-          <p className="muted">Loading…</p>
-        ) : down.length === 0 ? (
-          <p className="muted">Nothing is down right now.</p>
-        ) : (
-          <ul className="status-list">
-            {down.map((m) => (
-              <li key={m.id} className="status-row-top">
-                <div>
-                  <strong>{m.name}</strong> <span className="env">{m.environment}</span>
-                  <div className="mono small muted">{m.method} {m.url}</div>
-                  <div className="error-text small">{m.lastError} · down since {timeAgo(m.statusChangedAt)}</div>
-                </div>
-                <div className="status-meta">
-                  <button className="btn btn-small btn-ghost" disabled={checking === m.id} onClick={() => checkNow(m.id)}>
-                    {checking === m.id ? 'Checking…' : 'Check now'}
-                  </button>
-                  <StatusBadge status={m.status} />
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+        <h2>Open incidents {openIncidents.length > 0 && <span className="count">{openIncidents.length}</span>}</h2>
+        <OpenIncidents
+          incidents={openIncidents}
+          busyId={busyId}
+          onAcknowledge={(id) => run(id, () => incidentsApi.acknowledge(id))}
+          onCheckNow={(monitorId) => run(monitorId, () => monitorsApi.checkNow(monitorId))}
+        />
       </div>
 
       {degraded.length > 0 && (
@@ -96,8 +102,18 @@ export default function OnCall() {
         </div>
       )}
 
+      <div className="card">
+        <h2>Recent incidents</h2>
+        <IncidentHistory incidents={history} />
+      </div>
+
       <p className="muted small">
-        Downtime email alerts to <strong>{user.email}</strong> arrive in a later phase. See all <Link to="/monitors">monitors</Link>.
+        {user.role === ROLES.SRE
+          ? user.onCall !== false
+            ? <>You are <strong>on call</strong>: downtime emails go to {user.email}. </>
+            : <>You are <strong>not on call</strong> and won't get downtime emails. </>
+          : <>Admins get downtime emails only when no SRE is on call. </>}
+        Change this in <Link to="/account">Account</Link>. See all <Link to="/monitors">monitors</Link>.
       </p>
     </section>
   );

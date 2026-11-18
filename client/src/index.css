@@ -46,7 +46,7 @@ input, select { padding: .55rem .7rem; border: 1px solid var(--border); border-r
 .table th, .table td { text-align: left; padding: .55rem .5rem; border-bottom: 1px solid var(--border); }
 .table-wrap, .card:has(.table) { overflow-x: auto; }
 
-/* ---------- Monitors ---------- */
+/* ---------- Monitors (phase 2) ---------- */
 .page-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
 .page-header h1 { margin: 0; }
 .form.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem 1rem; }
@@ -76,7 +76,7 @@ input, select { padding: .55rem .7rem; border: 1px solid var(--border); border-r
 .status-list li:last-child { border-bottom: 0; }
 .status-meta { display: flex; align-items: center; gap: .6rem; }
 
-/* ---------- Monitoring results ---------- */
+/* ---------- Monitoring results (phase 3) ---------- */
 .link { background: none; border: 0; padding: 0; color: var(--primary); cursor: pointer; font: inherit; text-align: left; }
 .link:hover { text-decoration: underline; }
 .error-text { color: var(--danger); }
@@ -100,7 +100,7 @@ input, select { padding: .55rem .7rem; border: 1px solid var(--border); border-r
 .stat-value { font-size: 1.8rem; font-weight: 700; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 
-/* ---------- Live updates ---------- */
+/* ---------- Live updates (phase 4) ---------- */
 .live { display: inline-flex; align-items: center; gap: .35rem; font-size: .8rem; font-weight: 600; padding: .15rem .55rem; border-radius: 999px; border: 1px solid var(--border); }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .live-on { color: var(--ok); }
@@ -113,3 +113,13 @@ input, select { padding: .55rem .7rem; border: 1px solid var(--border); border-r
 .toast-down { border-left-color: var(--danger); }
 .toast-up { border-left-color: var(--ok); }
 .toast-close { background: none; border: 0; color: var(--muted); font-size: 1.2rem; cursor: pointer; line-height: 1; }
+
+/* ---------- Incidents & alerts (phase 5) ---------- */
+.notice { padding: .8rem 1.1rem; font-size: .92rem; border-left: 4px solid var(--primary); }
+.notice-warn { border-left-color: var(--warn); }
+.warn-text { color: var(--warn); }
+.count { display: inline-block; min-width: 1.4rem; padding: 0 .4rem; border-radius: 999px; background: var(--danger); color: #fff; font-size: .8rem; text-align: center; vertical-align: middle; }
+.incident { padding: .8rem 0; }
+.section-gap { margin-top: 1.5rem; }
+.actions { display: flex; gap: .6rem; margin: .6rem 0; }
+label.check { flex-direction: row; align-items: center; gap: .5rem; }

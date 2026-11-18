@@ -30,7 +30,7 @@ export function AuthProvider({ children }) {
     reconnectSocket(); // back to the public view
   }, []);
 
-  return <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, setUser, loading, login, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

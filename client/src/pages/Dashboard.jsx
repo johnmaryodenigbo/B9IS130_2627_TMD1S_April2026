@@ -4,7 +4,8 @@ import StatusBadge from '../components/StatusBadge.jsx';
 import UptimeBars from '../components/UptimeBars.jsx';
 import LiveIndicator from '../components/LiveIndicator.jsx';
 import { useLiveMonitors } from '../hooks/useLiveMonitors.js';
-import { timeAgo, formatUptime } from '../utils/format.js';
+import { useSocketEvent } from '../hooks/useSocket.js';
+import { timeAgo, formatUptime, formatDuration } from '../utils/format.js';
 
 const FALLBACK_REFRESH_MS = 60000; // safety net; normal updates arrive live over Socket.IO
 const ENV_ORDER = ['production', 'staging', 'qa', 'development'];
@@ -14,14 +15,20 @@ export default function Dashboard() {
   const [monitors, setMonitors] = useState(null);
   const [error, setError] = useState('');
   const [updatedAt, setUpdatedAt] = useState(null);
+  const [incidents, setIncidents] = useState([]);
+
+  const loadIncidents = useCallback(
+    () => publicApi.incidents(14).then(({ incidents }) => setIncidents(incidents)).catch(() => {}),
+    []
+  );
 
   const load = useCallback(
     () =>
-      publicApi
-        .monitors()
-        .then(({ monitors }) => { setMonitors(monitors); setError(''); setUpdatedAt(new Date()); })
-        .catch((e) => setError(e.message)),
-    []
+      Promise.all([
+        publicApi.monitors().then(({ monitors }) => { setMonitors(monitors); setError(''); setUpdatedAt(new Date()); }),
+        loadIncidents(),
+      ]).catch((e) => setError(e.message)),
+    [loadIncidents]
   );
 
   useEffect(() => {
@@ -31,6 +38,15 @@ export default function Dashboard() {
   }, [load]);
 
   useLiveMonitors({ monitors, setMonitors, refetch: load, publicOnly: true, onEvent: () => setUpdatedAt(new Date()) });
+
+  // Keep the incident list current (opened / resolved).
+  useSocketEvent('incident:update', (incident) => {
+    if (incident.isPublic === false) return; // staff also receive private ones
+    setIncidents((list) => {
+      const rest = list.filter((i) => i.id !== incident.id);
+      return [incident, ...rest].sort((a, b) => new Date(b.startedAt) - new Date(a.startedAt));
+    });
+  });
 
   const active = (monitors || []).filter((m) => m.status !== 'paused');
   const down = active.filter((m) => m.status === 'down').length;
@@ -89,6 +105,29 @@ export default function Dashboard() {
           </ul>
         </div>
       ))}
+
+      {monitors && (
+        <div className="card">
+          <h2>Incidents in the last 14 days</h2>
+          {incidents.length === 0 ? (
+            <p className="muted">No incidents.</p>
+          ) : (
+            <ul className="status-list">
+              {incidents.map((i) => (
+                <li key={i.id} className="status-row-top">
+                  <div>
+                    <strong>{i.monitorName}</strong> <span className="env">{i.environment}</span>
+                    <div className="muted small">{new Date(i.startedAt).toLocaleString()}</div>
+                  </div>
+                  {i.status === 'open'
+                    ? <span className="status status-down">Ongoing</span>
+                    : <span className="muted small">Resolved after {formatDuration(i.durationMs)}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </section>
   );
 }

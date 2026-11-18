@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { usersApi, ROLES } from '../api/client.js';
+import { usersApi, alertsApi, ROLES } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const emptyForm = { name: '', email: '', password: '', role: ROLES.SRE };
@@ -9,8 +9,13 @@ export default function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
+  const [alertInfo, setAlertInfo] = useState(null);
 
-  const load = () => usersApi.list().then(({ users }) => setUsers(users)).catch((e) => setError(e.message));
+  const load = () =>
+    Promise.all([
+      usersApi.list().then(({ users }) => setUsers(users)),
+      alertsApi.recipients().then(setAlertInfo),
+    ]).catch((e) => setError(e.message));
   useEffect(() => { load(); }, []);
 
   const run = async (fn) => {
@@ -35,6 +40,15 @@ export default function AdminUsers() {
     <section>
       <h1>User management</h1>
 
+      {alertInfo && (
+        <div className={`card notice ${alertInfo.fallback ? 'notice-warn' : ''}`}>
+          <strong>Downtime alerts</strong> currently go to{' '}
+          {alertInfo.recipients.length ? alertInfo.recipients.join(', ') : 'nobody'}
+          {alertInfo.fallback && ' (no SRE is on call, so admins are emailed instead)'}
+          <span className="muted"> · via {alertInfo.transport}</span>
+        </div>
+      )}
+
       <div className="card">
         <h2>Add user</h2>
         <form onSubmit={onCreate} className="form inline">
@@ -55,7 +69,7 @@ export default function AdminUsers() {
         <h2>Users ({users.length})</h2>
         <table className="table">
           <thead>
-            <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Last login</th><th /></tr>
+            <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th title="On-call SREs receive downtime emails">On call</th><th>Last login</th><th /></tr>
           </thead>
           <tbody>
             {users.map((u) => (
@@ -73,6 +87,17 @@ export default function AdminUsers() {
                     onClick={() => run(() => usersApi.update(u.id, { isActive: !u.isActive }))}>
                     {u.isActive ? 'Active' : 'Disabled'}
                   </button>
+                </td>
+                <td>
+                  {u.role === ROLES.SRE ? (
+                    <button className={`btn btn-small ${u.onCall ? 'btn-ok' : 'btn-ghost'}`}
+                      title={u.onCall ? 'Receives downtime emails' : 'Does not receive downtime emails'}
+                      onClick={() => run(() => usersApi.update(u.id, { onCall: !u.onCall }))}>
+                      {u.onCall ? 'On call' : 'Off'}
+                    </button>
+                  ) : (
+                    <span className="muted small" title="Admins are emailed only when no SRE is on call">backup</span>
+                  )}
                 </td>
                 <td className="muted">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : 'Never'}</td>
                 <td>
