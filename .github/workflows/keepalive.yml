@@ -1,0 +1,16 @@
+# Render's free web services sleep after 15 minutes without incoming traffic, and a sleeping
+# ZOps can't check anything. This pings the health endpoint every 10 minutes to keep it awake.
+# Set the repository variable ZOPS_URL (Settings -> Secrets and variables -> Actions -> Variables),
+# e.g. https://zops.onrender.com
+name: Keep ZOps awake
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    if: ${{ vars.ZOPS_URL != '' }}
+    steps:
+      - name: Ping /api/health
+        run: curl -fsS --retry 3 --retry-delay 20 --max-time 90 "${{ vars.ZOPS_URL }}/api/health"
