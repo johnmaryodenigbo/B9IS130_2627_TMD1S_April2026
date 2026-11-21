@@ -20,5 +20,7 @@ export function toPublicView(m) {
     statusChangedAt: o.statusChangedAt ?? null,
     lastCheckedAt: o.lastCheckedAt ?? null,
     lastResponseTimeMs: o.lastResponseTimeMs ?? null,
+    reportStatus: o.reportStatus ?? 'normal',
+    reportsRecent: o.reportsRecent ?? 0,
   };
 }

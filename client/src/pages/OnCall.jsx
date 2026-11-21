@@ -2,11 +2,38 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { monitorsApi, incidentsApi, ROLES } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
-import StatusBadge from '../components/StatusBadge.jsx';
+import StatusBadge, { ReportsBadge } from '../components/StatusBadge.jsx';
+import { REPORT_CATEGORIES } from '../api/client.js';
+import SslBadge, { sslDaysLeft } from '../components/SslBadge.jsx';
 import LiveIndicator from '../components/LiveIndicator.jsx';
 import { OpenIncidents, IncidentHistory } from '../components/IncidentList.jsx';
 import { useLiveMonitors } from '../hooks/useLiveMonitors.js';
 import { useSocketEvent } from '../hooks/useSocket.js';
+
+const categoryLabel = (c) => REPORT_CATEGORIES.find((x) => x.value === c)?.label || c;
+
+// One monitor with a spike of user reports, plus what users say is wrong (last hour).
+function ReportedRow({ m, onCheckNow, busy }) {
+  const [summary, setSummary] = useState(null);
+  useEffect(() => {
+    monitorsApi.reports(m.id, 1).then(setSummary).catch(() => {});
+  }, [m.id, m.reportsRecent]);
+  return (
+    <li className="status-row-top">
+      <div>
+        <strong>{m.name}</strong> <span className="env">{m.environment}</span>
+        <div className="small">{m.reportsRecent} reports in 15 min · checks: {m.status}</div>
+        {summary?.categories?.length > 0 && (
+          <div className="muted small">Last hour: {summary.categories.map((c) => `${categoryLabel(c.category)} ${c.count}`).join(' · ')}</div>
+        )}
+      </div>
+      <div className="status-meta">
+        <button className="btn btn-small btn-ghost" disabled={busy} onClick={onCheckNow}>{busy ? 'Checking…' : 'Check now'}</button>
+        <ReportsBadge monitor={m} />
+      </div>
+    </li>
+  );
+}
 
 const FALLBACK_REFRESH_MS = 60000; // safety net; normal updates arrive live over Socket.IO
 
@@ -59,6 +86,11 @@ export default function OnCall() {
   };
 
   const degraded = (monitors || []).filter((m) => m.status === 'up' && m.consecutiveFailures > 0);
+  const reported = (monitors || []).filter((m) => m.reportStatus === 'elevated');
+  // Certificates that expire within 30 days, have expired, or aren't trusted
+  const certIssues = (monitors || [])
+    .filter((m) => m.sslCheckedAt && (m.sslValidTo == null || sslDaysLeft(m) <= 30 || m.sslTrusted === false))
+    .sort((a, b) => (sslDaysLeft(a) ?? -999) - (sslDaysLeft(b) ?? -999));
   const up = (monitors || []).filter((m) => m.status === 'up').length;
   const down = (monitors || []).filter((m) => m.status === 'down').length;
 
@@ -85,6 +117,40 @@ export default function OnCall() {
           onCheckNow={(monitorId) => run(monitorId, () => monitorsApi.checkNow(monitorId))}
         />
       </div>
+
+      {reported.length > 0 && (
+        <div className="card">
+          <h2>Users reporting issues</h2>
+          <p className="muted small">Visitors of the status page are reporting problems well above the usual level, even if checks pass.</p>
+          <ul className="status-list">
+            {reported.map((m) => (
+              <ReportedRow key={m.id} m={m} onCheckNow={() => run(m.id, () => monitorsApi.checkNow(m.id))} busy={busyId === m.id} />
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {certIssues.length > 0 && (
+        <div className="card">
+          <h2>SSL certificates needing attention</h2>
+          <ul className="status-list">
+            {certIssues.map((m) => (
+              <li key={m.id} className="status-row-top">
+                <div>
+                  <strong>{m.name}</strong> <span className="env">{m.environment}</span>
+                  <div className="mono small muted">{m.url}</div>
+                  <div className="small">
+                    {m.sslValidTo ? `Expires ${new Date(m.sslValidTo).toLocaleDateString()}` : 'Could not read the certificate'}
+                    {m.sslIssuer && ` · ${m.sslIssuer}`}
+                    {m.sslError && <span className="error-text"> · {m.sslError}</span>}
+                  </div>
+                </div>
+                <SslBadge monitor={m} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {degraded.length > 0 && (
         <div className="card">

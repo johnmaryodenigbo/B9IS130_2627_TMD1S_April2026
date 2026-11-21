@@ -39,4 +39,29 @@ export const env = {
   alertCooldownMinutes: Number(process.env.ALERT_COOLDOWN_MINUTES ?? 5),
   // Re-send the DOWN email every N minutes while unacknowledged (0 = never)
   alertReminderMinutes: Number(process.env.ALERT_REMINDER_MINUTES ?? 60),
+  // HTTP email APIs (for hosts that block SMTP ports, e.g. Render's free tier)
+  brevoApiKey: process.env.BREVO_API_KEY || '',
+  resendApiKey: process.env.RESEND_API_KEY || '',
+
+  // User problem reports ("I have a problem" button on the public dashboard)
+  reportWindowMinutes: Number(process.env.REPORT_WINDOW_MINUTES) || 15,   // window compared against the baseline
+  reportMinCount: Number(process.env.REPORT_MIN_COUNT) || 3,              // never flag fewer reports than this
+  reportSpikeFactor: Number(process.env.REPORT_SPIKE_FACTOR) || 3,        // ...or fewer than N x the usual level
+  reportCooldownMinutes: Number(process.env.REPORT_COOLDOWN_MINUTES) || 10, // one report per visitor per monitor
+  reportAlertCooldownMinutes: Number(process.env.REPORT_ALERT_COOLDOWN_MINUTES ?? 60),
+  reportRetentionDays: Number(process.env.REPORT_RETENTION_DAYS) || 30,
+
+  // SSL certificate expiry (https monitors)
+  sslCheckHours: Number(process.env.SSL_CHECK_HOURS) || 12,           // re-read the certificate this often
+  sslAlertDays: (process.env.SSL_ALERT_DAYS || '30,14,7,3,1')          // email when days left reach each of these
+    .split(',').map(Number).filter((n) => n > 0).sort((a, b) => b - a),
+
+  // Visitor email subscriptions (status page "Get notified")
+  subscriptionsEnabled: process.env.SUBSCRIPTIONS_ENABLED !== 'false',
+
+  // Deployment
+  // Behind a proxy/load balancer (Render, Heroku, NGINX): number of proxy hops to trust for req.ip
+  trustProxy: process.env.TRUST_PROXY ? (Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY) : false,
+  // Serve the built React app (client/dist) from Express: one service hosts frontend + API
+  serveClient: process.env.SERVE_CLIENT === 'true',
 };

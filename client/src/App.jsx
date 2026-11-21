@@ -9,6 +9,7 @@ import Account from './pages/Account.jsx';
 import AdminUsers from './pages/AdminUsers.jsx';
 import Monitors from './pages/Monitors.jsx';
 import { Forbidden, NotFound } from './pages/Errors.jsx';
+import { ConfirmSubscription, Unsubscribe } from './pages/SubscriptionPages.jsx';
 import { ROLES } from './api/client.js';
 
 export default function App() {
@@ -22,6 +23,8 @@ export default function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/login" element={<Login />} />
           <Route path="/forbidden" element={<Forbidden />} />
+          <Route path="/subscribe/confirm" element={<ConfirmSubscription />} />
+          <Route path="/unsubscribe" element={<Unsubscribe />} />
 
           {/* Any logged-in staff (admin or SRE) */}
           <Route element={<ProtectedRoute roles={[ROLES.ADMIN, ROLES.SRE]} />}>

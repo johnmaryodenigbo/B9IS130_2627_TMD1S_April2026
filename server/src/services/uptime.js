@@ -1,4 +1,5 @@
 import { Check } from '../models/Check.js';
+import { Report } from '../models/Report.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -70,6 +71,58 @@ export async function getDailyHistory(monitorIds, days = 30) {
     monitorIds.map((id) => [
       id.toString(),
       dates.map((date) => ({ date, uptime: byKey.get(`${id}|${date}`) ?? null })),
+    ])
+  );
+}
+
+/**
+ * The last `hours` split into `buckets` equal slots (default 48 x 30 min), oldest first — for the
+ * dashboard sparkline. Each slot: { t (slot start), avgMs (avg response time of successful checks,
+ * null if none), failed, total, reports }.
+ * @returns {Promise<Map<string, object[]>>}
+ */
+export async function getSparklines(monitorIds, { hours = 24, buckets = 48 } = {}) {
+  const bucketMs = (hours * 3600_000) / buckets;
+  // Align slots to whole bucket boundaries so they don't shift on every request.
+  const end = Math.ceil(Date.now() / bucketMs) * bucketMs;
+  const start = new Date(end - hours * 3600_000);
+  const slotOf = (field) => ({ $floor: { $divide: [{ $subtract: [field, start] }, bucketMs] } });
+
+  const [checkRows, reportRows] = await Promise.all([
+    Check.aggregate([
+      { $match: { monitor: { $in: monitorIds }, checkedAt: { $gte: start } } },
+      {
+        $group: {
+          _id: { monitor: '$monitor', slot: slotOf('$checkedAt') },
+          total: { $sum: 1 },
+          failed: { $sum: { $cond: ['$ok', 0, 1] } },
+          okMs: { $sum: { $cond: ['$ok', '$responseTimeMs', 0] } },
+          okCount: { $sum: { $cond: ['$ok', 1, 0] } },
+        },
+      },
+    ]),
+    Report.aggregate([
+      { $match: { monitor: { $in: monitorIds }, createdAt: { $gte: start } } },
+      { $group: { _id: { monitor: '$monitor', slot: slotOf('$createdAt') }, reports: { $sum: 1 } } },
+    ]),
+  ]);
+
+  const checksByKey = new Map(checkRows.map((r) => [`${r._id.monitor}|${r._id.slot}`, r]));
+  const reportsByKey = new Map(reportRows.map((r) => [`${r._id.monitor}|${r._id.slot}`, r.reports]));
+
+  return new Map(
+    monitorIds.map((id) => [
+      id.toString(),
+      Array.from({ length: buckets }, (_, slot) => {
+        const c = checksByKey.get(`${id}|${slot}`);
+        return {
+          t: new Date(start.getTime() + slot * bucketMs).toISOString(),
+          avgMs: c?.okCount ? Math.round(c.okMs / c.okCount) : null,
+          failed: c?.failed ?? 0,
+          total: c?.total ?? 0,
+          reports: reportsByKey.get(`${id}|${slot}`) ?? 0,
+        };
+      }),
     ])
   );
 }

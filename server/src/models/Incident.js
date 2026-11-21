@@ -31,6 +31,7 @@ const incidentSchema = new mongoose.Schema(
 
     alertsSuppressed: { type: Boolean, default: false }, // flapping: went down again within the cooldown
     lastNotifiedAt: { type: Date },
+    subscribersNotifiedAt: { type: Date }, // visitors who subscribed were emailed about this outage
     notifications: [notificationSchema],
   },
   {

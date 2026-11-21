@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { usersApi, alertsApi, ROLES } from '../api/client.js';
+import { usersApi, alertsApi, subscribersApi, ROLES } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
 const emptyForm = { name: '', email: '', password: '', role: ROLES.SRE };
@@ -10,11 +10,13 @@ export default function AdminUsers() {
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState('');
   const [alertInfo, setAlertInfo] = useState(null);
+  const [subs, setSubs] = useState(null);
 
   const load = () =>
     Promise.all([
       usersApi.list().then(({ users }) => setUsers(users)),
       alertsApi.recipients().then(setAlertInfo),
+      subscribersApi.stats().then(setSubs),
     ]).catch((e) => setError(e.message));
   useEffect(() => { load(); }, []);
 
@@ -113,6 +115,31 @@ export default function AdminUsers() {
           </tbody>
         </table>
       </div>
+      {subs && (
+        <div className="card">
+          <h2>Status page subscribers ({subs.confirmed})</h2>
+          <p className="muted small">
+            Visitors who confirmed "Get notified" on the status page. They are emailed when a public monitor has an outage
+            and when it's resolved. {subs.pending > 0 && `${subs.pending} sign-up(s) waiting for confirmation.`}
+          </p>
+          {subs.subscribers.length > 0 && (
+            <div className="table-wrap">
+              <table className="table">
+                <thead><tr><th>Email</th><th>Services</th><th>Since</th></tr></thead>
+                <tbody>
+                  {subs.subscribers.map((s) => (
+                    <tr key={s.email}>
+                      <td>{s.email}</td>
+                      <td>{s.services === 'all' ? 'All' : s.services}</td>
+                      <td className="muted small">{new Date(s.confirmedAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

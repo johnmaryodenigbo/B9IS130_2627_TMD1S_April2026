@@ -35,6 +35,23 @@ const monitorSchema = new mongoose.Schema(
     statusChangedAt: { type: Date },              // when it last went up/down (for "down since")
     nextCheckAt: { type: Date, default: Date.now }, // the worker picks up monitors whose time has come
 
+    // SSL certificate (https monitors only), refreshed every SSL_CHECK_HOURS
+    sslValidTo: { type: Date },
+    sslValidFrom: { type: Date },
+    sslDaysRemaining: { type: Number },
+    sslIssuer: { type: String },
+    sslSubject: { type: String },
+    sslTrusted: { type: Boolean },   // chain valid and matches the host name
+    sslError: { type: String },
+    sslCheckedAt: { type: Date },
+    sslAlertedDays: { type: Number }, // last threshold we emailed about (avoids repeats); 0 = expired
+
+    // User problem reports (crowd-sourced, like Downdetector)
+    reportStatus: { type: String, enum: ['normal', 'elevated'], default: 'normal' },
+    reportsRecent: { type: Number, default: 0 },  // reports in the last REPORT_WINDOW_MINUTES
+    reportsChangedAt: { type: Date },
+    reportsAlertedAt: { type: Date },
+
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },

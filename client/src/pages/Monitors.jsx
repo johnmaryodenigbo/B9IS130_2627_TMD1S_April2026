@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { monitorsApi, ROLES, ENVIRONMENTS, INTERVALS } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import MonitorForm, { toFormValues } from '../components/MonitorForm.jsx';
-import StatusBadge from '../components/StatusBadge.jsx';
+import StatusBadge, { ReportsBadge } from '../components/StatusBadge.jsx';
+import SslBadge from '../components/SslBadge.jsx';
 import CheckHistory from '../components/CheckHistory.jsx';
 import LiveIndicator from '../components/LiveIndicator.jsx';
 import { useLiveMonitors } from '../hooks/useLiveMonitors.js';
@@ -130,7 +131,10 @@ export default function Monitors() {
               <tbody>
                 {monitors.map((m) => (
                   <tr key={m.id}>
-                    <td><StatusBadge status={m.status} /></td>
+                    <td>
+                      <StatusBadge status={m.status} />
+                      <div><ReportsBadge monitor={m} showCount /></div>
+                    </td>
                     <td>
                       <button className="link" onClick={() => setHistoryFor(m)} title="Show recent checks">
                         <strong>{m.name}</strong>
@@ -142,6 +146,7 @@ export default function Monitors() {
                     <td className="mono small">
                       {m.method} {m.url}
                       <div className="muted">expects {m.expectedStatus} · timeout {m.timeoutMs / 1000}s</div>
+                      <div><SslBadge monitor={m} /></div>
                     </td>
                     <td>{intervalLabel(m.intervalSeconds)}</td>
                     <td>

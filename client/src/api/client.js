@@ -44,12 +44,30 @@ export const monitorsApi = {
   remove: (id) => api(`/monitors/${id}`, { method: 'DELETE' }),
   checks: (id, limit = 20) => api(`/monitors/${id}/checks?limit=${limit}`),
   checkNow: (id) => api(`/monitors/${id}/check`, { method: 'POST' }),
+  reports: (id, hours = 24) => api(`/monitors/${id}/reports?hours=${hours}`),
 };
 
 export const publicApi = {
   monitors: () => api('/public/monitors'),
   incidents: (days = 14) => api(`/public/incidents?days=${days}`),
+  report: (monitorId, category) => api(`/public/monitors/${monitorId}/reports`, { method: 'POST', body: { category } }),
+  subscribe: (email, monitorIds = []) => api('/public/subscriptions', { method: 'POST', body: { email, monitorIds } }),
+  confirmSubscription: (token) => api('/public/subscriptions/confirm', { method: 'POST', body: { token } }),
+  unsubscribe: (token) => api('/public/subscriptions/unsubscribe', { method: 'POST', body: { token } }),
 };
+
+export const subscribersApi = {
+  stats: () => api('/subscribers'),
+};
+
+// Problem types a visitor can report (keep in sync with server/src/models/Report.js).
+export const REPORT_CATEGORIES = [
+  { value: 'down', label: 'Not loading / down' },
+  { value: 'slow', label: 'Slow' },
+  { value: 'login', label: "Can't log in" },
+  { value: 'errors', label: 'Errors' },
+  { value: 'other', label: 'Something else' },
+];
 
 export const incidentsApi = {
   list: ({ status, limit = 50 } = {}) => api(`/incidents?limit=${limit}${status ? `&status=${status}` : ''}`),

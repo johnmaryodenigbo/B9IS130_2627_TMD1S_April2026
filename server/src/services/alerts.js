@@ -4,7 +4,9 @@ import { Monitor } from '../models/Monitor.js';
 import { Incident } from '../models/Incident.js';
 import { monitorEvents } from './events.js';
 import { sendMail, describeMailError } from './mailer.js';
-import { downEmail, recoveredEmail } from './emailTemplates.js';
+import { downEmail, recoveredEmail, reportsEmail, sslEmail } from './emailTemplates.js';
+import { sweepReportStatuses } from './reports.js';
+import { notifySubscribers } from './subscriptions.js';
 
 const MINUTE = 60_000;
 
@@ -79,6 +81,7 @@ async function openIncident(monitor, check, logger) {
     logger.log(`[alerts] ${monitor.name} is flapping (down again within ${env.alertCooldownMinutes} min): no email`);
   } else {
     await notify(incident, 'down', downEmail({ monitor, incident, check, appUrl: env.appUrl }), logger);
+    await notifySubscribers({ monitor, incident, type: 'down' }, logger);
   }
   return incident;
 }
@@ -97,6 +100,11 @@ async function resolveIncident(monitor, resolution, logger) {
   const downWasEmailed = incident.notifications.some((n) => n.type === 'down');
   if (resolution === 'recovered' && downWasEmailed && !incident.alertsSuppressed) {
     await notify(incident, 'recovered', recoveredEmail({ monitor, incident, appUrl: env.appUrl }), logger);
+  }
+  // Visitors who got the outage email hear when it's really fixed (not when it was only paused or deleted).
+  if (resolution === 'recovered' && incident.subscribersNotifiedAt) {
+    const publicMonitor = { _id: incident.monitor, name: incident.monitorName, environment: incident.environment, isPublic: incident.isPublic };
+    await notifySubscribers({ monitor: publicMonitor, incident, type: 'resolved' }, logger);
   }
   return incident;
 }
@@ -147,25 +155,83 @@ export async function sendDueReminders(logger = console) {
 }
 
 /**
+ * Users started reporting problems: email the on-call SREs, at most once per
+ * REPORT_ALERT_COOLDOWN_MINUTES per monitor. Not an incident: the automated checks may still pass.
+ */
+export async function handleReportsChange({ monitor, to, recent, categories }, logger = console) {
+  if (to !== 'elevated') return null;
+  const cooldownStart = new Date(Date.now() - env.reportAlertCooldownMinutes * MINUTE);
+  // Claim the alert atomically so only one process emails.
+  const claimed = await Monitor.findOneAndUpdate(
+    { _id: monitor._id, $or: [{ reportsAlertedAt: null }, { reportsAlertedAt: { $lt: cooldownStart } }] },
+    { $set: { reportsAlertedAt: new Date() } },
+    { returnDocument: 'after' }
+  ).lean();
+  if (!claimed) {
+    logger.log(`[alerts] ${monitor.name}: users reporting issues again, within cooldown: no email`);
+    return null;
+  }
+  const { recipients } = await getAlertRecipients();
+  if (!recipients.length) return null;
+  try {
+    await sendMail({
+      to: recipients,
+      ...reportsEmail({ monitor: claimed, recent, windowMinutes: env.reportWindowMinutes, categories, appUrl: env.appUrl }),
+    });
+    logger.log(`[alerts] reports email for ${monitor.name}: sent to ${recipients.join(', ')}`);
+    return { sent: true, recipients };
+  } catch (err) {
+    logger.error(`[alerts] reports email for ${monitor.name} failed: ${describeMailError(err)}`);
+    return { sent: false, error: describeMailError(err) };
+  }
+}
+
+// A certificate reached an expiry threshold (30/14/7/3/1 days, or expired): email on-call.
+// runCheck() records the threshold on the monitor first, so each threshold is emailed once.
+export async function handleSslWarning({ monitor, daysRemaining }, logger = console) {
+  const { recipients } = await getAlertRecipients();
+  if (!recipients.length) return null;
+  try {
+    await sendMail({ to: recipients, ...sslEmail({ monitor, daysRemaining, appUrl: env.appUrl }) });
+    logger.log(`[alerts] SSL email for ${monitor.name} (${daysRemaining} days left): sent to ${recipients.join(', ')}`);
+    return { sent: true };
+  } catch (err) {
+    logger.error(`[alerts] SSL email for ${monitor.name} failed: ${describeMailError(err)}`);
+    return { sent: false, error: describeMailError(err) };
+  }
+}
+
+/**
  * Starts listening for status changes. Call it in every process that runs checks
  * (the API, for "check now", and the worker). Reminders should run where the worker runs.
  */
-export function startAlerting({ reminders = true, logger = console } = {}) {
+export function startAlerting({ reminders = true, sweepReports = true, logger = console } = {}) {
   const safe = (fn) => (payload) => fn(payload, logger).catch((err) => logger.error(`[alerts] ${err.message}`));
   const onStatus = safe(handleStatusChange);
   const onSaved = safe(handleMonitorSaved);
   const onDeleted = safe(handleMonitorDeleted);
+  const onReports = safe(handleReportsChange);
+  const onSsl = safe(handleSslWarning);
 
   monitorEvents.on('status-change', onStatus);
   monitorEvents.on('monitor-saved', onSaved);
   monitorEvents.on('monitor-deleted', onDeleted);
+  monitorEvents.on('reports-change', onReports);
+  monitorEvents.on('ssl-warning', onSsl);
 
   const timer = reminders && env.alertReminderMinutes
     ? setInterval(() => sendDueReminders(logger).catch((err) => logger.error(`[alerts] reminders: ${err.message}`)), MINUTE)
     : null;
 
+  const sweepTimer = sweepReports
+    ? setInterval(() => sweepReportStatuses().catch((err) => logger.error(`[alerts] report sweep: ${err.message}`)), MINUTE)
+    : null;
+
   return {
     stop() {
+      clearInterval(sweepTimer);
+      monitorEvents.off('reports-change', onReports);
+      monitorEvents.off('ssl-warning', onSsl);
       monitorEvents.off('status-change', onStatus);
       monitorEvents.off('monitor-saved', onSaved);
       monitorEvents.off('monitor-deleted', onDeleted);

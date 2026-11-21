@@ -18,6 +18,7 @@ export const ROOMS = { PUBLIC: 'public', STAFF: 'staff' };
  *   monitor:status   a monitor went up/down  { monitor, from, to, check? }
  *   monitor:removed  a monitor was deleted (or made private, for anonymous viewers)  { id }
  *   incident:update  an incident was opened, emailed, acknowledged or resolved
+ *   monitor:reports  user reports for a monitor spiked or calmed down  { monitor, from, to, recent }
  */
 export function initRealtime(httpServer, { logger = console } = {}) {
   const io = new Server(httpServer, {
@@ -74,7 +75,15 @@ export function initRealtime(httpServer, { logger = console } = {}) {
     }
   };
 
+  const onUpdated = ({ monitor }) => broadcastMonitor(monitor);
+  const onReports = ({ monitor, from, to, recent, categories }) => {
+    io.to(ROOMS.STAFF).emit('monitor:reports', { monitor: toStaffView(monitor), from, to, recent, categories });
+    if (monitor.isPublic) toAnonymous().emit('monitor:reports', { monitor: toPublicView(monitor), from, to, recent });
+  };
+
   monitorEvents.on('checked', onChecked);
+  monitorEvents.on('monitor-updated', onUpdated);
+  monitorEvents.on('reports-change', onReports);
   monitorEvents.on('incident-changed', onIncident);
   monitorEvents.on('monitor-saved', onSaved);
   monitorEvents.on('monitor-deleted', onDeleted);
@@ -88,6 +97,8 @@ export function initRealtime(httpServer, { logger = console } = {}) {
     // Stops listening and closes all sockets (and the HTTP server it is attached to).
     async close() {
       monitorEvents.off('checked', onChecked);
+      monitorEvents.off('monitor-updated', onUpdated);
+      monitorEvents.off('reports-change', onReports);
       monitorEvents.off('incident-changed', onIncident);
       monitorEvents.off('monitor-saved', onSaved);
       monitorEvents.off('monitor-deleted', onDeleted);

@@ -77,6 +77,97 @@ export function recoveredEmail({ monitor, incident, appUrl }) {
   };
 }
 
+const CATEGORY_LABELS = { down: 'Not loading / down', slow: 'Slow', login: 'Can\'t log in', errors: 'Errors', other: 'Other' };
+export const categoryLabel = (c) => CATEGORY_LABELS[c] || c;
+
+export function reportsEmail({ monitor, recent, windowMinutes, categories = [], appUrl }) {
+  const label = `${monitor.name} (${monitor.environment})`;
+  const heading = `USERS REPORTING ISSUES: ${label}`;
+  const breakdown = categories.map((c) => `${categoryLabel(c.category)} ${c.count}`).join(', ');
+  const rows = [
+    ['Monitor', monitor.name],
+    ['Environment', monitor.environment],
+    ['URL', `${monitor.method || 'GET'} ${monitor.url}`],
+    ['Reports', `${recent} in the last ${windowMinutes} min`],
+    ['What users say', breakdown],
+    ['Automated checks', monitor.status === 'up' ? 'Passing (users may see something the checks miss)' : monitor.status],
+  ];
+  const footer = 'Visitors of the public status page reported problems well above the usual level.';
+  return {
+    subject: `[ZOps] ${heading}`,
+    text: textBody(heading, rows, appUrl, footer),
+    html: layout({ color: '#d97706', heading, rows, appUrl, footer }),
+  };
+}
+
+export function sslEmail({ monitor, daysRemaining, appUrl }) {
+  const label = `${monitor.name} (${monitor.environment})`;
+  const expired = daysRemaining < 0;
+  const heading = expired
+    ? `SSL CERTIFICATE EXPIRED: ${label}`
+    : `SSL certificate expires in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}: ${label}`;
+  const rows = [
+    ['Monitor', monitor.name],
+    ['Environment', monitor.environment],
+    ['URL', monitor.url],
+    ['Expires', monitor.sslValidTo ? formatTime(monitor.sslValidTo) : ''],
+    ['Certificate for', monitor.sslSubject],
+    ['Issued by', monitor.sslIssuer],
+    ['Problem', monitor.sslError],
+  ];
+  const footer = expired
+    ? 'Browsers now show a security warning for this site. Renew the certificate as soon as possible.'
+    : 'Renew the certificate (e.g. certbot renew) before it expires to avoid browser security warnings.';
+  return {
+    subject: `[ZOps] ${heading}`,
+    text: textBody(heading, rows, appUrl, footer),
+    html: layout({ color: expired ? '#dc2626' : '#d97706', heading, rows, appUrl, footer }),
+  };
+}
+
+// ---------- Emails to visitors (public wording: no URLs or error details) ----------
+
+function visitorLayout({ color, heading, paragraphs, buttonText, buttonUrl, unsubscribeUrl }) {
+  const body = paragraphs.map((p) => `<p style="margin:0 0 12px">${escapeHtml(p)}</p>`).join('');
+  const unsubscribe = unsubscribeUrl
+    ? `<p style="color:#6b7280;font-size:12px;margin-top:20px">You get these emails because you subscribed to ZOps status updates. <a href="${escapeHtml(unsubscribeUrl)}" style="color:#6b7280">Unsubscribe</a></p>`
+    : '';
+  return `<!doctype html><html><body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#1d2330;margin:0;padding:24px;background:#f6f7f9">
+<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e3e6eb;border-radius:10px;overflow:hidden">
+<div style="background:${color};color:#fff;padding:16px 20px;font-size:18px;font-weight:600">${escapeHtml(heading)}</div>
+<div style="padding:16px 20px;font-size:14px">${body}
+<p style="margin:20px 0 0"><a href="${escapeHtml(buttonUrl)}" style="background:#2563eb;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;display:inline-block">${escapeHtml(buttonText)}</a></p>
+${unsubscribe}</div></div></body></html>`;
+}
+
+export function subscribeConfirmEmail({ monitorNames = [], confirmUrl, appUrl }) {
+  const what = monitorNames.length ? monitorNames.join(', ') : 'all services';
+  const heading = 'Confirm your ZOps status updates';
+  const paragraphs = [
+    `Someone (hopefully you) asked to be emailed when there is an outage on: ${what}.`,
+    'Click the button to confirm. If this wasn\'t you, ignore this email and nothing will happen.',
+  ];
+  return {
+    subject: '[ZOps] Confirm your status updates',
+    text: [heading, '', ...paragraphs, '', `Confirm: ${confirmUrl}`, '', `Status page: ${appUrl}`].join('\n'),
+    html: visitorLayout({ color: '#2563eb', heading, paragraphs, buttonText: 'Confirm subscription', buttonUrl: confirmUrl }),
+  };
+}
+
+export function visitorIncidentEmail({ monitor, incident, type, appUrl, unsubscribeUrl }) {
+  const label = `${monitor.name} (${monitor.environment})`;
+  const resolved = type === 'resolved';
+  const heading = resolved ? `Resolved: ${label}` : `Outage: ${label}`;
+  const paragraphs = resolved
+    ? [`${label} is working again.`, `The outage started at ${formatTime(incident.startedAt)} and lasted ${formatDuration(new Date(incident.resolvedAt).getTime() - new Date(incident.startedAt).getTime())}.`]
+    : [`${label} is currently not working as expected. Our team has been alerted and is looking into it.`, `Started: ${formatTime(incident.startedAt)}`, 'We will email you again when it is resolved.'];
+  return {
+    subject: `[ZOps status] ${heading}`,
+    text: [heading, '', ...paragraphs, '', `Status page: ${appUrl}`, '', `Unsubscribe: ${unsubscribeUrl}`].join('\n'),
+    html: visitorLayout({ color: resolved ? '#16a34a' : '#dc2626', heading, paragraphs, buttonText: 'View status page', buttonUrl: appUrl, unsubscribeUrl }),
+  };
+}
+
 export function testEmail({ user, appUrl }) {
   const heading = 'ZOps test email';
   const rows = [['Sent to', `${user.name} <${user.email}>`], ['Time', formatTime(new Date())]];

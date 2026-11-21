@@ -43,7 +43,7 @@ export function me(req, res) {
   res.json({ user: req.user });
 }
 
-// e.g. an SRE turning their own alert emails on/off.
+// PATCH /api/auth/me — e.g. an SRE turning their own alert emails on/off.
 export async function updateMe(req, res) {
   if (req.body.onCall !== undefined) req.user.onCall = req.body.onCall;
   await req.user.save();

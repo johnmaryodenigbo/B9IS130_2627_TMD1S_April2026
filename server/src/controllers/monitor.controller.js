@@ -1,8 +1,10 @@
 import { Monitor } from '../models/Monitor.js';
 import { Check } from '../models/Check.js';
+import { Report } from '../models/Report.js';
+import { Subscriber } from '../models/Subscriber.js';
 import { AppError } from '../utils/AppError.js';
 import { runCheck } from '../services/checkRunner.js';
-import { getUptimeStats, getDailyHistory, EMPTY_UPTIME } from '../services/uptime.js';
+import { getUptimeStats, getDailyHistory, getSparklines, EMPTY_UPTIME } from '../services/uptime.js';
 import { monitorEvents } from '../services/events.js';
 import { toPublicView } from '../services/monitorViews.js';
 
@@ -65,6 +67,11 @@ export async function updateMonitor(req, res) {
     monitor.consecutiveFailures = 0;
   }
   if (monitor.status !== previousStatus) monitor.statusChangedAt = new Date();
+  // New URL = new certificate: read it on the next check and forget old expiry alerts.
+  if (monitor.isModified('url')) {
+    monitor.sslCheckedAt = undefined;
+    monitor.sslAlertedDays = undefined;
+  }
 
   // Check again straight away when it was resumed or what/how often we check changed.
   if (monitor.isActive && (!wasActive || targetChanged || monitor.isModified('intervalSeconds'))) {
@@ -78,7 +85,20 @@ export async function updateMonitor(req, res) {
 
 export async function deleteMonitor(req, res) {
   const monitor = await findMonitorOr404(req.params.id);
-  await Promise.all([monitor.deleteOne(), Check.deleteMany({ monitor: monitor._id })]);
+  await Promise.all([
+    monitor.deleteOne(),
+    Check.deleteMany({ monitor: monitor._id }),
+    Report.deleteMany({ monitor: monitor._id }),
+  ]);
+  // Visitors who followed only this service are removed (an empty list would mean "all services");
+  // everyone else just stops following it.
+  await Subscriber.deleteMany({
+    $or: [
+      { monitors: { $size: 1, $all: [monitor._id] } },
+      { confirmed: false, pendingMonitors: { $size: 1, $all: [monitor._id] } },
+    ],
+  });
+  await Subscriber.updateMany({}, { $pull: { monitors: monitor._id, pendingMonitors: monitor._id } });
   monitorEvents.emit('monitor-deleted', { id: monitor.id, isPublic: monitor.isPublic });
   res.status(204).end();
 }
@@ -96,7 +116,7 @@ export async function checkNow(req, res) {
   const monitor = await findMonitorOr404(req.params.id);
   if (!monitor.isActive) throw new AppError('Resume this monitor before checking it', 400);
 
-  const { check } = await runCheck(monitor);
+  const { check } = await runCheck(monitor, { forceSsl: true });
   const [updated] = await withUptime([await findMonitorOr404(monitor.id)]);
   res.json({ check, monitor: updated });
 }
@@ -105,7 +125,11 @@ export async function checkNow(req, res) {
 export async function listPublicMonitors(_req, res) {
   const monitors = await Monitor.find({ isPublic: true }).sort({ environment: 1, name: 1 }).lean();
   const ids = monitors.map((m) => m._id);
-  const [stats, history] = await Promise.all([getUptimeStats(ids), getDailyHistory(ids, 30)]);
+  const [stats, history, sparklines] = await Promise.all([
+    getUptimeStats(ids),
+    getDailyHistory(ids, 30),
+    getSparklines(ids),
+  ]);
 
   res.json({
     monitors: monitors.map((m) => {
@@ -114,6 +138,7 @@ export async function listPublicMonitors(_req, res) {
         ...toPublicView(m),
         uptime: stats.get(id) ?? EMPTY_UPTIME,
         history: history.get(id) ?? [],
+        sparkline: sparklines.get(id) ?? [],
       };
     }),
   });

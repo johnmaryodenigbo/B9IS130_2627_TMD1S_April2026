@@ -33,7 +33,7 @@ export async function createUser(req, res) {
 
 export async function updateUser(req, res) {
   const user = await findUserOr404(req.params.id);
-  const { name, role, isActive, password } = req.body;
+  const { name, role, isActive, onCall, password } = req.body;
 
   const losingAdmin = (role && role !== ROLES.ADMIN) || isActive === false;
   if (losingAdmin) await assertNotLastAdmin(user);

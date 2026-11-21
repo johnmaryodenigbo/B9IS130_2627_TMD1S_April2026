@@ -65,3 +65,20 @@ export const createMonitorSchema = z.object({
 export const updateMonitorSchema = z
   .object(Object.fromEntries(Object.entries(monitorFields).map(([k, v]) => [k, v.optional()])))
   .refine((v) => Object.keys(v).length > 0, 'Provide at least one field to update');
+
+// ---------- User problem reports ----------
+export const createReportSchema = z.object({
+  category: z.enum(['down', 'slow', 'login', 'errors', 'other']).default('other'),
+});
+
+// ---------- Visitor email subscriptions ----------
+const objectId = z.string().regex(/^[a-f0-9]{24}$/i, 'Invalid id');
+
+export const subscribeSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  monitorIds: z.array(objectId).max(100).default([]),
+});
+
+export const tokenSchema = z.object({
+  token: z.string().trim().min(10).max(200),
+});
